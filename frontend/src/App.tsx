@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { ApiError, api, isVersionConflict } from "./api";
+import { formatLimaDateTime } from "./dates";
 import { clearToken, readToken, saveToken } from "./session";
 import type { Project, Task, TaskStatus, Workspace } from "./types";
 
@@ -358,7 +359,9 @@ function Board({ token, onSignOut }: { token: string; onSignOut: () => void }) {
                       <h3>{task.title}</h3>
                       {task.description && <p>{task.description}</p>}
                       <div className="task-meta">
-                        <span>v{task.version}</span>
+                        <time dateTime={task.updated_at} title="Hora de Lima, Perú">
+                          {formatLimaDateTime(task.updated_at)} · v{task.version}
+                        </time>
                         {canWrite && <button onClick={() => setEditor(task)}>Editar</button>}
                       </div>
                     </article>

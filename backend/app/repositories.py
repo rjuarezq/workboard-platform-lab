@@ -1,9 +1,10 @@
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import func, select, update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from app.core.time import utc_now
 from app.models import MembershipRole, Project, Task, User, Workspace, WorkspaceMembership
 
 READ_ROLES = tuple(MembershipRole)
@@ -152,7 +153,7 @@ class TaskRepository:
                 Task.version == expected_version,
                 is_editor,
             )
-            .values(**changes, version=Task.version + 1, updated_at=func.now())
+            .values(**changes, version=Task.version + 1, updated_at=utc_now())
             .returning(Task)
         )
         return session.execute(statement).scalar_one_or_none()

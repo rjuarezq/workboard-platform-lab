@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from sqlalchemy import (
-    DateTime,
     Enum,
     ForeignKey,
     Integer,
@@ -17,6 +16,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.identifiers import uuid7
+from app.core.time import UtcDateTime, utc_now
 from app.database import Base
 
 
@@ -35,10 +36,12 @@ class TaskStatus(StrEnum):
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid7)
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        UtcDateTime(), default=utc_now, server_default=func.now()
+    )
 
     memberships: Mapped[list[WorkspaceMembership]] = relationship(back_populates="user")
     created_tasks: Mapped[list[Task]] = relationship(back_populates="creator")
@@ -47,9 +50,11 @@ class User(Base):
 class Workspace(Base):
     __tablename__ = "workspaces"
 
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid7)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        UtcDateTime(), default=utc_now, server_default=func.now()
+    )
 
     memberships: Mapped[list[WorkspaceMembership]] = relationship(back_populates="workspace")
     projects: Mapped[list[Project]] = relationship(back_populates="workspace")
@@ -59,13 +64,15 @@ class WorkspaceMembership(Base):
     __tablename__ = "workspace_memberships"
     __table_args__ = (UniqueConstraint("workspace_id", "user_id", name="uq_workspace_membership"),)
 
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid7)
     workspace_id: Mapped[UUID] = mapped_column(ForeignKey("workspaces.id"), nullable=False)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     role: Mapped[MembershipRole] = mapped_column(
         Enum(MembershipRole, name="membership_role", native_enum=False), nullable=False
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        UtcDateTime(), default=utc_now, server_default=func.now()
+    )
 
     workspace: Mapped[Workspace] = relationship(back_populates="memberships")
     user: Mapped[User] = relationship(back_populates="memberships")
@@ -74,12 +81,14 @@ class WorkspaceMembership(Base):
 class Project(Base):
     __tablename__ = "projects"
 
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid7)
     workspace_id: Mapped[UUID] = mapped_column(
         ForeignKey("workspaces.id"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(160), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        UtcDateTime(), default=utc_now, server_default=func.now()
+    )
 
     workspace: Mapped[Workspace] = relationship(back_populates="projects")
     tasks: Mapped[list[Task]] = relationship(back_populates="project")
@@ -88,7 +97,7 @@ class Project(Base):
 class Task(Base):
     __tablename__ = "tasks"
 
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid7)
     project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
     created_by_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -99,9 +108,11 @@ class Task(Base):
         nullable=False,
     )
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        UtcDateTime(), default=utc_now, server_default=func.now()
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+        UtcDateTime(), default=utc_now, server_default=func.now(), onupdate=utc_now
     )
 
     project: Mapped[Project] = relationship(back_populates="tasks")
