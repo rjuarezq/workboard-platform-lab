@@ -1,0 +1,19 @@
+# This file applies when building with:
+# docker build --file frontend/Dockerfile .
+
+*
+!frontend/
+!frontend/package.json
+!frontend/pnpm-lock.yaml
+!frontend/index.html
+!frontend/tsconfig.json
+!frontend/tsconfig.app.json
+!frontend/tsconfig.node.json
+!frontend/vite.config.ts
+!frontend/src/
+!frontend/src/**
+!frontend/public/
+!frontend/public/**
+!infra/
+!infra/nginx/
+!infra/nginx/nginx.conf
