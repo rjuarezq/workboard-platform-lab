@@ -17,9 +17,9 @@ COPY frontend/ ./
 
 RUN pnpm run build
 
-# ===================================================
-# STAGE 2: (RUNTIME) Run FastAPI without build tools
-# ===================================================
+# =====================================================================
+# STAGE 2: (RUNTIME) Serve the React/Vite SPA with hardened Nginx OSS
+# =====================================================================
 FROM nginx:1.31.6-alpine3.24 AS runtime
 
 COPY --from=builder /app/dist/ /usr/share/nginx/html
