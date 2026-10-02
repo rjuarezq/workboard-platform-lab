@@ -1,0 +1,23 @@
+services:
+
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: runtime
+    ports:
+      - "127.0.0.1:8080:8080"
+
+networks:
+  data_private:
+    internal: false

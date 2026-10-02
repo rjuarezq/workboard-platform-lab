@@ -1,0 +1,4 @@
+services:
+  web:
+    ports:
+      - "${WEB_BIND_ADDRESS:?Define WEB_BIND_ADDRESS}:${WEB_HOST_PORT:?Define WEB_HOST_PORT}:8080"

@@ -1,0 +1,175 @@
+name: workboard
+
+x-local-logging: &local-logging
+  driver: local
+  options:
+    max-size: "15m"
+    max-file: "4"
+    compress: "true"
+
+x-python-runtime: &python-runtime
+  PYTHONDONTWRITEBYTECODE: "1"
+  PYTHONUNBUFFERED: "1"
+
+services:
+  db:
+    image: "${POSTGRES_IMAGE:?Define POSTGRES_IMAGE in the selected .env file}"
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:? Define POSTGRES_DB in .env}"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:? Define POSTGRES_PASSWORD in .env}"
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: "--data-checksums --auth-host=scram-sha-256"
+      WORKBOARD_MIGRATOR_DB_PASSWORD: "${WORKBOARD_MIGRATOR_DB_PASSWORD:?Define it in .env}"
+      WORKBOARD_APP_DB_PASSWORD: "${WORKBOARD_APP_DB_PASSWORD:?Define it in .env}"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./infra/postgres/initdb/10-apply-roles.sh:/docker-entrypoint-initdb.d/10-apply-roles.sh:ro
+      - ./infra/postgres/bootstrap/create-roles.sql:/opt/workboard-bootstrap/create-roles.sql:ro
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - data_private
+    shm_size: 128m
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: "768m"
+          pids: 200
+    healthcheck:
+      test:
+        ["CMD-SHELL", 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    logging: *local-logging
+
+  migrate:
+    image: "${WORKBOARD_BACKEND_IMAGE:?Define WORKBOARD_BACKEND_IMAGE in the selected env file}"
+    restart: no
+    read_only: true
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *python-runtime
+      WORKBOARD_DATABASE_URL: "${WORKBOARD_MIGRATION_DATABASE_URL:?Define WORKBOARD_MIGRATION_DATABASE_URL}"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - data_private
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m,mode=0700,uid=10001,gid=10001
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: "256m"
+          pids: 64
+    logging: *local-logging
+
+  backend:
+    image: "${WORKBOARD_BACKEND_IMAGE:?Define WORKBOARD_BACKEND_IMAGE in the selected env file}"
+    restart: unless-stopped
+    read_only: true
+    init: true
+    stop_grace_period: 30s
+    environment:
+      <<: *python-runtime
+      WORKBOARD_DATABASE_URL: "${WORKBOARD_RUNTIME_DATABASE_URL:?Define WORKBOARD_RUNTIME_DATABASE_URL}"
+      WORKBOARD_JWT_SECRET: "${WORKBOARD_JWT_SECRET:?Define WORKBOARD_JWT_SECRET}"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - app_private
+      - data_private
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m,mode=0700,uid=10001,gid=10001
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: "512m"
+          pids: 128
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health', timeout=2).read()",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+    logging: *local-logging
+
+  web:
+    image: "${WORKBOARD_FRONTEND_IMAGE:?Define WORKBOARD_FRONTEND_IMAGE in the selected env file}"
+    restart: unless-stopped
+    read_only: true
+    stop_grace_period: 15s
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    networks:
+      - edge
+      - app_private
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m,mode=0700,uid=101,gid=101
+
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: "128m"
+          pids: 64
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -T 2 -O /dev/null http://127.0.0.1:8080/ || exit 1",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+    logging: *local-logging
+
+networks:
+  data_private:
+    driver: bridge
+    internal: true
+  app_private:
+    driver: bridge
+    internal: true
+  edge:
+    driver: bridge
+    internal: false
+
+volumes:
+  postgres_data:
